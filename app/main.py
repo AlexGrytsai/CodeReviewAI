@@ -1,16 +1,40 @@
-# This is a sample Python script.
+import asyncio
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+from fastapi import FastAPI
+from pydantic import BaseModel, HttpUrl
+from starlette.responses import JSONResponse
+
+from app.services.github_services import fetch_repo_contents
+from logger_config import setup_logger
+
+logger = setup_logger()
+
+app = FastAPI()
 
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+class ReviewRequest(BaseModel):
+    assignment_description: str
+    github_repo_url: HttpUrl
+    candidate_level: str
 
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
+@app.post("/review")
+async def review(request: ReviewRequest) -> JSONResponse:
+    try:
+        logger.info(
+            f"Trying to fetch repo contents for {request.github_repo_url}"
+        )
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+        repo_data = await fetch_repo_contents(request.github_repo_url)
+    except Exception as e:
+        logger.error(f"Error fetching repo contents: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"message": "Error fetching repo contents"}
+        )
+
+
+request_sample = ReviewRequest(assignment_description="some description",
+                               github_repo_url="https://errors.pydantic.dev/2.9/v/url_parsing",
+                               candidate_level="1")
+asyncio.run(review(request_sample))
