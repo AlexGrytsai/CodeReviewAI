@@ -2,7 +2,7 @@ import os
 
 import httpx
 from dotenv import load_dotenv
-from pydantic import HttpUrl, BaseModel
+from pydantic import HttpUrl
 
 from logger_config import setup_logger
 
@@ -11,38 +11,35 @@ logger = setup_logger()
 load_dotenv()
 
 
-class RepoUrlValidator(BaseModel):
-    repo_url: HttpUrl
-
-
 class GitHubService:
     API_HOST = "https://api.github.com"
 
     @staticmethod
     def _validate_url(url: str) -> HttpUrl:
         try:
-            valid_url = RepoUrlValidator(repo_url=url).repo_url
+            valid_url = HttpUrl(url)
             host = valid_url.host
             if host != "github.com":
-                logger.error(f"Unsupported host: {host}")
                 raise Exception(f"Unsupported host: {host}")
 
             path = valid_url.path
-            split_path = valid_url.path.split("/")[1:]
-            if len(split_path) != 2:
-                logger.error(f"Invalid path: {path}")
-                raise Exception(f"Invalid path: {path}")
-            return valid_url
+            if path:
+                split_path = path.split("/")[1:]
+                if len(split_path) != 2:
+                    raise Exception(f"Invalid path: {path}")
+                return valid_url
+            raise Exception(f"Invalid path: {path} in {url}")
 
         except Exception as e:
-            logger.error(f"Error validating repo url: {e}")
             raise Exception(f"Error validating repo url: {e}")
 
     @staticmethod
     def _get_owner_and_repo(repo_url: HttpUrl) -> tuple[str, str]:
-        owner, repo = repo_url.path.split("/")[1:]
+        if repo_url.path:
+            owner, repo = repo_url.path.split("/")[1:]
 
-        return owner, repo
+            return owner, repo
+        raise Exception(f"Invalid path: {repo_url.path} in {repo_url}")
 
     @staticmethod
     async def _fetch_repo_contents(owner: str, repo: str) -> list[dict]:
