@@ -18,6 +18,7 @@ requests = "^2.32.3"
 fastapi = "^0.115.2"
 python-dotenv = "^1.0.1"
 black = "^24.10.0"
+flake8 = "^7.1.1"
 
 
 [build-system]
