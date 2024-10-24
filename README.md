@@ -62,6 +62,8 @@ To run this project, you need:
   "detail": "Prompt is too long: 57281 tokens. Max tokens: 30000"
 }
 ```
+## Test coverage
+![tests](https://i.ibb.co/23P2q0J/image.png)
 
 ## Possible ways of scaling
 **Scaling Related to GitHub and OpenAI Limits**
