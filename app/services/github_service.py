@@ -115,7 +115,11 @@ class GitHubService:
                             f"{response.status_code}",
                         )
                 except httpx.ConnectTimeout:
+                    logger.info("Connect timeout to GitHub. Retry...")
                     if number_retry == 0:
+                        logger.warning(
+                            "Connect timeout. Cannot fetch repo contents"
+                        )
                         raise HTTPException(
                             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
                             detail="Connect timeout. "
@@ -163,7 +167,6 @@ class GitHubService:
 
         structure_data = []
         for item in repo_data:
-            logger.info(f"Processing item: {item}")
             if item["type"] == "file":
                 structure_data.append(await self._get_file_content(item))
             elif item["type"] == "dir":
