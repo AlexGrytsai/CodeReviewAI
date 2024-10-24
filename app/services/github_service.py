@@ -208,7 +208,10 @@ class GitHubService:
             owner, repo = self._get_owner_and_repo(valid_url)
 
             try:
-                async with httpx.AsyncClient() as client:
+                limits = httpx.Limits(
+                    max_connections=100, max_keepalive_connections=10
+                )
+                async with httpx.AsyncClient(limits=limits) as client:
                     raw_repo_data = await self._fetch_repo_contents(
                         owner, repo, client
                     )
