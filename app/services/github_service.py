@@ -1,8 +1,9 @@
 import asyncio
 import base64
+import json
 import os
 from datetime import datetime
-from typing import Any
+from typing import Any, Dict, List
 
 import httpx
 from dotenv import load_dotenv
@@ -131,10 +132,7 @@ class GitHubService:
                 number_retry -= 1
 
     async def _fetch_repo_contents(
-        self,
-        owner: str,
-        repo: str,
-        client: httpx.AsyncClient
+        self, owner: str, repo: str, client: httpx.AsyncClient
     ) -> list[dict[Any, Any]] | dict[Any, Any]:
 
         url = f"{GitHubService.API_HOST}/repos/{owner}/{repo}/contents"
@@ -145,7 +143,9 @@ class GitHubService:
     def _decode_content(content: str) -> str:
         return base64.b64decode(content).decode("utf-8")
 
-    async def _get_file_content(self, item: dict, client: httpx.AsyncClient) -> dict[str, str | Any]:
+    async def _get_file_content(
+        self, item: dict, client: httpx.AsyncClient
+    ) -> dict[str, str | Any]:
         if item.get("url"):
             self_data = await self._make_request(item["url"], client)
 
@@ -159,27 +159,46 @@ class GitHubService:
 
     async def _get_dir_content(
         self, item: dict, client: httpx.AsyncClient
-    ) -> list[dict[str, str]] | dict[Any, Any]:
+    ) -> List[Dict[str, Any]]:
 
         if item.get("url"):
             dir_data = await self._make_request(item["url"], client)
             return await self._receive_repo_data(dir_data, client)
 
-        return []
+        return [{"name": item["name"], "type": "dir", "content": []}]
 
     async def _receive_repo_data(
         self,
         repo_data: list[dict[Any, Any]] | dict[Any, Any],
-        client: httpx.AsyncClient
+        client: httpx.AsyncClient,
     ) -> list[dict[Any, Any]]:
+        structure_data = []
+
         tasks = []
+        directories = []
         for item in repo_data:
             if item["type"] == "file":
                 tasks.append(self._get_file_content(item, client))
             elif item["type"] == "dir":
+                directories.append(item)
                 tasks.append(self._get_dir_content(item, client))
 
-        structure_data = await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks)
+
+        result_idx = 0
+        for item in repo_data:
+            if item["type"] == "file":
+                structure_data.append(results[result_idx])
+                result_idx += 1
+            elif item["type"] == "dir":
+                directory_structure = {
+                    "name": item["name"],
+                    "type": item["type"],
+                    "content": results[result_idx],
+                }
+                structure_data.append(directory_structure)
+                result_idx += 1
+
         return structure_data
 
     async def main(self, repo_url: str) -> list[dict]:
@@ -204,7 +223,8 @@ class GitHubService:
                     logger.info(
                         f"Time taken to fetch repo contents: {time_taken}"
                     )
-
+                    with open("repo_data.json", "w") as f:
+                        json.dump(clean_repo_data, f)
                     return clean_repo_data
 
             except Exception as exc:
@@ -216,7 +236,3 @@ class GitHubService:
                 detail=f"Invalid repo url: {repo_url}. "
                        f"Cannot fetch repo contents",
             )
-
-if __name__ == "__main__":
-    git = GitHubService()
-    a = asyncio.run(git.main("https://github.com/AlexGrytsai/CityLibraryServiceAPI"))
