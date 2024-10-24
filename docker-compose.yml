@@ -8,3 +8,11 @@ services:
       - ./:/app
     ports:
       - "8000:8000"
+
+  redis:
+    image: redis:alpine
+    restart: on-failure
+    env_file:
+      - .env
+    ports:
+      - "6379:6379"
