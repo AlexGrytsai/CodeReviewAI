@@ -1,11 +1,11 @@
 from typing import Any
 
 from fastapi import FastAPI
+from fastapi import HTTPException, status
 from pydantic import BaseModel
 
 from app.services.manage_api_service import ManageAPIService
 from settings import setup_logger
-from fastapi import HTTPException, status
 
 logger = setup_logger()
 
