@@ -3,9 +3,14 @@ import os
 
 import tiktoken
 from dotenv import load_dotenv
-from openai import AsyncOpenAI
-from fastapi.exceptions import HTTPException
-from fastapi import status
+from openai import (
+    AsyncOpenAI,
+    APITimeoutError,
+    AuthenticationError,
+    InternalServerError,
+    RateLimitError,
+)
+from fastapi import HTTPException, status
 
 from settings import setup_logger, OPENAI_MODEL, MODEL_TOKEN_LIMITS
 
@@ -89,31 +94,58 @@ class OpenAIService:
                 f"Return data without special characters or formatting."
             )
 
-            try:
-                logger.info(
-                    f"Trying to analyze code with OpenAI for '{repo_url}'"
-                )
-                response = await self.client.chat.completions.create(
-                    model=OPENAI_MODEL,
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": "You are a code review assistant.",
-                        },
-                        {"role": "user", "content": prompt},
-                    ],
-                )
+            number_retry_connection = 10
 
-                review = response.choices[0].message.content
-                review_json = json.loads(review)
+            while True:
+                try:
+                    logger.info(
+                        f"Trying to analyze code with OpenAI for '{repo_url}'"
+                    )
+                    response = await self.client.chat.completions.create(
+                        model=OPENAI_MODEL,
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "You are a code review assistant.",
+                            },
+                            {"role": "user", "content": prompt},
+                        ],
+                    )
 
-                logger.info(
-                    f"Finished analyzing code with OpenAI for {repo_url}"
-                )
-                return review_json
+                    review = response.choices[0].message.content
+                    review_json = json.loads(review)
 
-            except Exception as e:
-                raise Exception(f"Error analyzing code: {e}")
+                    logger.info(
+                        f"Finished analyzing code with OpenAI for {repo_url}"
+                    )
+                    return review_json
+
+                except APITimeoutError:
+                    if number_retry_connection == 0:
+                        logger.critical(
+                            "Request timeout for OpenAI. Service unavailable."
+                        )
+                        raise HTTPException(
+                            status_code=status.HTTP_408_REQUEST_TIMEOUT,
+                            detail="Request timeout. Please try again later.",
+                        )
+                    else:
+                        number_retry_connection -= 1
+                        logger.info(
+                            f"Timeout error for OpenAI. "
+                            f"Retrying ({number_retry_connection}. "
+                            f"Left {number_retry_connection})"
+                        )
+                except (
+                    AuthenticationError,
+                    InternalServerError,
+                    RateLimitError,
+                ) as exc:
+                    logger.critical(exc)
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="Service unavailable. Please try again later.",
+                    )
 
         except HTTPException as exc:
             raise exc
