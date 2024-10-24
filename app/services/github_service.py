@@ -172,24 +172,14 @@ class GitHubService:
         repo_data: list[dict[Any, Any]] | dict[Any, Any],
         client: httpx.AsyncClient
     ) -> list[dict[Any, Any]]:
-
-        structure_data = []
+        tasks = []
         for item in repo_data:
             if item["type"] == "file":
-                structure_data.append(await self._get_file_content(item, client))
+                tasks.append(self._get_file_content(item, client))
             elif item["type"] == "dir":
-                dir_content = await self._get_dir_content(item, client)
-                directory_structure = {
-                    "name": item["name"],
-                    "type": item["type"],
-                    "content": [],
-                }
-                structure_data.append(directory_structure)
-                for content in dir_content:
-                    if content.get("type") == "file":
-                        directory_structure["content"].append(content)
-                    elif content.get("type") == "dir":
-                        directory_structure["content"].append(content)
+                tasks.append(self._get_dir_content(item, client))
+
+        structure_data = await asyncio.gather(*tasks)
         return structure_data
 
     async def main(self, repo_url: str) -> list[dict]:
@@ -229,4 +219,4 @@ class GitHubService:
 
 if __name__ == "__main__":
     git = GitHubService()
-    asyncio.run(git.main("https://github.com/AlexGrytsai/CityLibraryServiceAPI"))
+    a = asyncio.run(git.main("https://github.com/AlexGrytsai/CityLibraryServiceAPI"))
