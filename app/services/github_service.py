@@ -5,6 +5,8 @@ from typing import Any
 import httpx
 from dotenv import load_dotenv
 from pydantic import HttpUrl
+from fastapi import HTTPException
+from fastapi import status
 
 from logger_config import setup_logger
 
@@ -22,18 +24,31 @@ class GitHubService:
             valid_url = HttpUrl(url)
             host = valid_url.host
             if host != "github.com":
-                raise Exception(f"Unsupported host: {host}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unsupported host: {host}",
+                )
 
             path = valid_url.path
             if path:
                 split_path = path.split("/")[1:]
                 if len(split_path) != 2:
-                    raise Exception(f"Invalid path: {path}")
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid path: {path}",
+                    )
                 return valid_url
-            raise Exception(f"Invalid path: {path} in {url}")
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid path: {path} in {url}",
+                )
 
-        except Exception as e:
-            raise Exception(f"Error validating repo url: {e}")
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Error validating repo url: {exc}",
+            )
 
     @staticmethod
     def _get_owner_and_repo(repo_url: HttpUrl) -> tuple[str, str]:
@@ -41,7 +56,11 @@ class GitHubService:
             owner, repo = repo_url.path.split("/")[1:]
 
             return owner, repo
-        raise Exception(f"Invalid path: {repo_url.path} in {repo_url}")
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid path: {repo_url.path} in {repo_url}",
+        )
 
     @staticmethod
     async def _make_request(url: str) -> list[dict] | dict:
@@ -64,15 +83,43 @@ class GitHubService:
                             f"Status code: {response.status_code}. "
                         )
                         return response.json()
+                    elif response.status_code == 403:
+                        logger.info(
+                            f"Status code: {response.status_code}, "
+                            f"Message: {response.text}"
+                        )
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail={response.text},
+                        )
+                    elif response.status_code == 404:
+                        logger.info(f"Repo contents not found for url: {url}.")
+                        raise HTTPException(
+                            status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"Repo contents not found for url: {url}",
+                        )
+                    elif response.status_code == 429:
+                        logger.info(
+                            f"Status code: {response.status_code}, "
+                            f"Message: {response.text}"
+                        )
+                        raise HTTPException(
+                            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            detail={response.text},
+                        )
                     else:
-                        raise Exception(
-                            f"Error fetching repo contents: "
-                            f"{response}, status code: {response.status_code}"
+                        raise HTTPException(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Error fetching repo contents: "
+                            f"{response}, status code: "
+                            f"{response.status_code}",
                         )
                 except httpx.ConnectTimeout:
                     if number_retry == 0:
-                        raise Exception(
-                            "Connect timeout. Cannot fetch repo contents"
+                        raise HTTPException(
+                            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                            detail="Connect timeout. "
+                            "Cannot fetch repo contents",
                         )
                     number_retry -= 1
 
@@ -128,9 +175,9 @@ class GitHubService:
                 }
                 structure_data.append(directory_structure)
                 for content in dir_content:
-                    if content["type"] == "file":
+                    if content.get("type") == "file":
                         directory_structure["content"].append(content)
-                    elif content["type"] == "dir":
+                    elif content.get("type") == "dir":
                         directory_structure["content"].append(content)
         return structure_data
 
@@ -144,10 +191,12 @@ class GitHubService:
                 clean_repo_data = await self._receive_repo_data(raw_repo_data)
                 return clean_repo_data
 
-            except Exception as e:
-                raise Exception(f"Error fetching repo contents: {e}")
+            except Exception as exc:
+                raise exc
 
         else:
-            raise Exception(
-                f"Invalid repo url: {repo_url}. Cannot fetch repo contents"
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid repo url: {repo_url}. "
+                f"Cannot fetch repo contents",
             )
