@@ -1,6 +1,5 @@
 import asyncio
 import base64
-import json
 import os
 from datetime import datetime
 from typing import Any, Dict, List
@@ -223,8 +222,6 @@ class GitHubService:
                     logger.info(
                         f"Time taken to fetch repo contents: {time_taken}"
                     )
-                    with open("repo_data.json", "w") as f:
-                        json.dump(clean_repo_data, f)
                     return clean_repo_data
 
             except Exception as exc:
