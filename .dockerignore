@@ -1,0 +1,5 @@
+.dockerignore
+.env
+.idea
+htmlcov
+.coverage
