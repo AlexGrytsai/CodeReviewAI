@@ -62,3 +62,26 @@ To run this project, you need:
   "detail": "Prompt is too long: 57281 tokens. Max tokens: 30000"
 }
 ```
+
+## Possible ways of scaling
+**Scaling Related to GitHub and OpenAI Limits**
+
+For a standard account, GitHub offers a limit of 5,000 requests per hour and 
+no more than 100 concurrent requests. I see two possible scaling options:
+
+1.  **Upgrade to GitHub Enterprise Cloud**, which provides a limit of 15,000 requests per hour (250 requests per minute). The cost is $21 per user per month. You can add users as needed to increase the hourly request limit by running multiple applications with different tokens.
+    
+2.  **Create multiple GitHub accounts**, using a token from another account when the limit is reached. This is a more budget-friendly option, but there is a risk of GitHub blocking accounts due to aggressive requests.
+    
+
+For handling large repositories with 100+ files that exceed OpenAI’s token limits in a single request, consider first using **text-embedding-3-small** for initial analysis, followed by **gpt-4-turbo**.
+
+To improve performance, you can use a database to store information for each repository owner. Given the data format, it’s better to use a document-oriented database, like MongoDB or Amazon DocumentDB (which has a free version).
+
+Considering the instability of potential loads on the application, I would choose a **serverless architecture**. This allows for more flexible scaling during high loads.
+
+One possible architecture could be to separate the application into two parts: one for fetching data from GitHub and the other for OpenAI. Each application runs in **AWS ECS**, with scaling rules configured, allowing independent scaling as needed. The applications communicate through a message broker, such as **AWS MQ**, which is also set up for scaling.
+
+For caching, you can use **AWS ElastiCache** or free alternatives. It’s also important to consider that load may vary by region, necessitating deployment in different regions and the use of a load balancer to distribute load across clusters.
+
+You must implement limitations on the number of requests an unauthorized user can send, as well as establish restrictions for authorized users (e.g., 5 new requests if the data is not in the cache or database). It’s unlikely that a real user will send more requests (considering OpenAI’s response time). This will optimize performance, reduce costs, and enhance security—since uncontrolled requests to OpenAI can lead to application crashes and denial of service, slow down response times for other users, and significantly increase AWS service expenses.
