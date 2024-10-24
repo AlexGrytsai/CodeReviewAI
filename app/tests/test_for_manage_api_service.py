@@ -28,16 +28,17 @@ async def test_validate_candidate_level_failure(manage_api_service):
 
 
 @pytest.mark.asyncio
-@patch.object(GitHubService, 'main', new_callable=AsyncMock)
+@patch.object(GitHubService, "main", new_callable=AsyncMock)
 async def test_main_github_failure(mock_github_service, manage_api_service):
-    mock_github_service.side_effect = HTTPException(status_code=404,
-                                                    detail="Repo not found")
+    mock_github_service.side_effect = HTTPException(
+        status_code=404, detail="Repo not found"
+    )
 
     with pytest.raises(HTTPException) as exc_info:
         await manage_api_service.main(
             repo_url="https://github.com/user/repo",
             candidate_level="junior",
-            assignment_description="Code review assignment"
+            assignment_description="Code review assignment",
         )
     assert exc_info.value.status_code == 404
     assert "Repo not found" in exc_info.value.detail
