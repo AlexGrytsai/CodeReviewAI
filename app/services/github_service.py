@@ -1,12 +1,13 @@
 import base64
 import os
+from datetime import datetime
 from typing import Any
 
 import httpx
 from dotenv import load_dotenv
-from pydantic import HttpUrl
 from fastapi import HTTPException
 from fastapi import status
+from pydantic import HttpUrl
 
 from settings import setup_logger
 
@@ -111,8 +112,8 @@ class GitHubService:
                         raise HTTPException(
                             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f"Error fetching repo contents: "
-                            f"{response}, status code: "
-                            f"{response.status_code}",
+                                   f"{response}, status code: "
+                                   f"{response.status_code}",
                         )
                 except httpx.ConnectTimeout:
                     logger.info("Connect timeout to GitHub. Retry...")
@@ -123,7 +124,7 @@ class GitHubService:
                         raise HTTPException(
                             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
                             detail="Connect timeout. "
-                            "Cannot fetch repo contents",
+                                   "Cannot fetch repo contents",
                         )
                     number_retry -= 1
 
@@ -187,11 +188,19 @@ class GitHubService:
     async def main(self, repo_url: str) -> list[dict]:
         valid_url = self._validate_url(repo_url)
         if valid_url:
+            start_time = datetime.now()
+
             owner, repo = self._get_owner_and_repo(valid_url)
 
             try:
                 raw_repo_data = await self._fetch_repo_contents(owner, repo)
                 clean_repo_data = await self._receive_repo_data(raw_repo_data)
+
+                end_time = datetime.now()
+                time_taken = end_time - start_time
+
+                logger.info(f"Time taken to fetch repo contents: {time_taken}")
+
                 return clean_repo_data
 
             except Exception as exc:
@@ -201,5 +210,5 @@ class GitHubService:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid repo url: {repo_url}. "
-                f"Cannot fetch repo contents",
+                       f"Cannot fetch repo contents",
             )

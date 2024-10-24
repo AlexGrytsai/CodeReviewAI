@@ -30,7 +30,6 @@ class ManageAPIService:
         self, repo_url: str, candidate_level: str, assignment_description: str
     ) -> Dict[str, Any]:
         try:
-            start_time = datetime.now()
             logger.info(
                 f"Trying to validate candidate level: {candidate_level}"
             )
@@ -40,27 +39,14 @@ class ManageAPIService:
 
             repo_data = await self.github_service.main(repo_url)
 
-            end_time_fetching_repo = datetime.now()
-
             logger.info(f"Trying to analyze code with OpenAI for '{repo_url}'")
 
             code_review = await self.openai_service.analyze_code_with_openai(
                 repo_data, candidate_level, assignment_description, repo_url
             )
 
-            end_time_analyzing_code = datetime.now()
-
-            time_for_fetching_repo = end_time_fetching_repo - start_time
-            time_for_analyzing_code = (
-                end_time_analyzing_code - end_time_fetching_repo
-            )
-            total_time = end_time_analyzing_code - start_time
-
             logger.info(
-                f"Finished analyzing code with OpenAI for '{repo_url}'.\n"
-                f"Time for fetching repo contents: {time_for_fetching_repo}.\n"
-                f"Time for analyzing code: {time_for_analyzing_code}.\n"
-                f"Total time: {total_time}"
+                f"Finished analyzing code with OpenAI for '{repo_url}'."
             )
 
             return code_review

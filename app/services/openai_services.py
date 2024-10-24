@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime
 
 import tiktoken
 from dotenv import load_dotenv
@@ -67,6 +68,8 @@ class OpenAIService:
         assignment_description: str,
         repo_url: str,
     ) -> None:
+        start_analyzing_code = datetime.now()
+
         logger.info(f"Starting code review with OpenAI for '{repo_url}'")
         logger.info(
             f"Starting formatting repo data for prompt for '{repo_url}'"
@@ -117,6 +120,12 @@ class OpenAIService:
 
                     logger.info(
                         f"Finished analyzing code with OpenAI for {repo_url}"
+                    )
+
+                    end_analyzing_code = datetime.now()
+                    time_taken = end_analyzing_code - start_analyzing_code
+                    logger.info(
+                        f"Time taken to analyze code with OpenAI: {time_taken}"
                     )
                     return review_json
 
