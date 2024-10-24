@@ -57,3 +57,8 @@ To run this project, you need:
 "Try it out". After that - fill in the required data for the request and click "Execute".
 
 ## What OpenAI thinks about this project
+```json
+{
+  "detail": "Prompt is too long: 57281 tokens. Max tokens: 30000"
+}
+```
