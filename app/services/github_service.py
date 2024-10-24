@@ -8,7 +8,7 @@ from pydantic import HttpUrl
 from fastapi import HTTPException
 from fastapi import status
 
-from logger_config import setup_logger
+from settings import setup_logger
 
 logger = setup_logger()
 
