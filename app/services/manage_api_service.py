@@ -5,7 +5,7 @@ from fastapi import status
 
 from app.services.github_service import GitHubService
 from app.services.openai_services import OpenAIService
-from logger_config import setup_logger
+from settings import setup_logger
 
 logger = setup_logger()
 
@@ -21,7 +21,7 @@ class ManageAPIService:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid candidate level. "
-                       "Must be 'junior', 'middle', or 'senior'"
+                "Must be 'junior', 'middle', or 'senior'",
             )
         return True
 
