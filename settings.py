@@ -10,6 +10,8 @@ MODEL_TOKEN_LIMITS = {
     "gpt-3.5-turbo": 200000,
 }
 
+REDIS_URL = "redis://redis:6379"
+
 def setup_logger() -> logging.Logger:
     logging.basicConfig(
         level=logging.INFO,
