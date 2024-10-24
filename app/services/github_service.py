@@ -1,7 +1,8 @@
+import asyncio
 import base64
 import os
 from datetime import datetime
-from typing import Any
+from typing import Any, Dict, List
 
 import httpx
 from dotenv import load_dotenv
@@ -64,7 +65,9 @@ class GitHubService:
         )
 
     @staticmethod
-    async def _make_request(url: str) -> list[dict] | dict:
+    async def _make_request(
+        url: str, client: httpx.AsyncClient
+    ) -> list[dict] | dict:
         headers = {
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {os.getenv('GITHUB_TOKEN')}",
@@ -72,77 +75,78 @@ class GitHubService:
         }
 
         logger.info(f"Making request to: {url}")
-        async with httpx.AsyncClient() as client:
-            number_retry = 10
-            while True:
-                try:
-                    logger.info(f"Trying to fetch repo contents: {url}")
-                    response = await client.get(url, headers=headers)
-                    if response.status_code == 200:
-                        logger.info(
-                            f"Repo contents fetched successfully. "
-                            f"Status code: {response.status_code}. "
-                        )
-                        return response.json()
-                    elif response.status_code == 403:
-                        logger.info(
-                            f"Status code: {response.status_code}, "
-                            f"Message: {response.text}"
-                        )
-                        raise HTTPException(
-                            status_code=status.HTTP_403_FORBIDDEN,
-                            detail={response.text},
-                        )
-                    elif response.status_code == 404:
-                        logger.info(f"Repo contents not found for url: {url}.")
-                        raise HTTPException(
-                            status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"Repo contents not found for url: {url}",
-                        )
-                    elif response.status_code == 429:
-                        logger.info(
-                            f"Status code: {response.status_code}, "
-                            f"Message: {response.text}"
-                        )
-                        raise HTTPException(
-                            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                            detail={response.text},
-                        )
-                    else:
-                        raise HTTPException(
-                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail=f"Error fetching repo contents: "
-                                   f"{response}, status code: "
-                                   f"{response.status_code}",
-                        )
-                except httpx.ConnectTimeout:
-                    logger.info("Connect timeout to GitHub. Retry...")
-                    if number_retry == 0:
-                        logger.warning(
-                            "Connect timeout. Cannot fetch repo contents"
-                        )
-                        raise HTTPException(
-                            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-                            detail="Connect timeout. "
-                                   "Cannot fetch repo contents",
-                        )
-                    number_retry -= 1
+        number_retry = 10
+        while True:
+            try:
+                logger.info(f"Trying to fetch repo contents: {url}")
+                response = await client.get(url, headers=headers)
+                if response.status_code == 200:
+                    logger.info(
+                        f"Repo contents fetched successfully. "
+                        f"Status code: {response.status_code}. "
+                    )
+                    return response.json()
+                elif response.status_code == 403:
+                    logger.info(
+                        f"Status code: {response.status_code}, "
+                        f"Message: {response.text}"
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail={response.text},
+                    )
+                elif response.status_code == 404:
+                    logger.info(f"Repo contents not found for url: {url}.")
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Repo contents not found for url: {url}",
+                    )
+                elif response.status_code == 429:
+                    logger.info(
+                        f"Status code: {response.status_code}, "
+                        f"Message: {response.text}"
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail={response.text},
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Error fetching repo contents: "
+                               f"{response}, status code: "
+                               f"{response.status_code}",
+                    )
+            except httpx.ConnectTimeout:
+                logger.info("Connect timeout to GitHub. Retry...")
+                if number_retry == 0:
+                    logger.warning(
+                        "Connect timeout. Cannot fetch repo contents"
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                        detail="Connect timeout. "
+                               "Cannot fetch repo contents",
+                    )
+                number_retry -= 1
 
     async def _fetch_repo_contents(
-        self, owner: str, repo: str
+        self, owner: str, repo: str, client: httpx.AsyncClient
     ) -> list[dict[Any, Any]] | dict[Any, Any]:
 
         url = f"{GitHubService.API_HOST}/repos/{owner}/{repo}/contents"
 
-        return await self._make_request(url)
+        return await self._make_request(url, client)
 
     @staticmethod
     def _decode_content(content: str) -> str:
         return base64.b64decode(content).decode("utf-8")
 
-    async def _get_file_content(self, item: dict) -> dict[str, str | Any]:
+    async def _get_file_content(
+        self, item: dict, client: httpx.AsyncClient
+    ) -> dict[str, str | Any]:
         if item.get("url"):
-            self_data = await self._make_request(item["url"])
+            self_data = await self._make_request(item["url"], client)
 
             if isinstance(self_data, dict) and self_data.get("content"):
                 content = self._decode_content(self_data["content"])
@@ -153,36 +157,47 @@ class GitHubService:
         return {}
 
     async def _get_dir_content(
-        self, item: dict
-    ) -> list[dict[str, str]] | dict[Any, Any]:
+        self, item: dict, client: httpx.AsyncClient
+    ) -> List[Dict[str, Any]]:
 
         if item.get("url"):
-            dir_data = await self._make_request(item["url"])
-            return await self._receive_repo_data(dir_data)
+            dir_data = await self._make_request(item["url"], client)
+            return await self._receive_repo_data(dir_data, client)
 
-        return []
+        return [{"name": item["name"], "type": "dir", "content": []}]
 
     async def _receive_repo_data(
-        self, repo_data: list[dict[Any, Any]] | dict[Any, Any]
+        self,
+        repo_data: list[dict[Any, Any]] | dict[Any, Any],
+        client: httpx.AsyncClient,
     ) -> list[dict[Any, Any]]:
-
         structure_data = []
+
+        tasks = []
+        directories = []
         for item in repo_data:
             if item["type"] == "file":
-                structure_data.append(await self._get_file_content(item))
+                tasks.append(self._get_file_content(item, client))
             elif item["type"] == "dir":
-                dir_content = await self._get_dir_content(item)
+                directories.append(item)
+                tasks.append(self._get_dir_content(item, client))
+
+        results = await asyncio.gather(*tasks)
+
+        result_idx = 0
+        for item in repo_data:
+            if item["type"] == "file":
+                structure_data.append(results[result_idx])
+                result_idx += 1
+            elif item["type"] == "dir":
                 directory_structure = {
                     "name": item["name"],
                     "type": item["type"],
-                    "content": [],
+                    "content": results[result_idx],
                 }
                 structure_data.append(directory_structure)
-                for content in dir_content:
-                    if content.get("type") == "file":
-                        directory_structure["content"].append(content)
-                    elif content.get("type") == "dir":
-                        directory_structure["content"].append(content)
+                result_idx += 1
+
         return structure_data
 
     async def main(self, repo_url: str) -> list[dict]:
@@ -193,15 +208,21 @@ class GitHubService:
             owner, repo = self._get_owner_and_repo(valid_url)
 
             try:
-                raw_repo_data = await self._fetch_repo_contents(owner, repo)
-                clean_repo_data = await self._receive_repo_data(raw_repo_data)
+                async with httpx.AsyncClient() as client:
+                    raw_repo_data = await self._fetch_repo_contents(
+                        owner, repo, client
+                    )
+                    clean_repo_data = await self._receive_repo_data(
+                        raw_repo_data, client
+                    )
 
-                end_time = datetime.now()
-                time_taken = end_time - start_time
+                    end_time = datetime.now()
+                    time_taken = end_time - start_time
 
-                logger.info(f"Time taken to fetch repo contents: {time_taken}")
-
-                return clean_repo_data
+                    logger.info(
+                        f"Time taken to fetch repo contents: {time_taken}"
+                    )
+                    return clean_repo_data
 
             except Exception as exc:
                 raise exc
