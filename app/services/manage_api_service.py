@@ -1,5 +1,8 @@
 from typing import Dict, Any
 
+from fastapi import HTTPException
+from fastapi import status
+
 from app.services.github_service import GitHubService
 from app.services.openai_services import OpenAIService
 from logger_config import setup_logger
@@ -15,9 +18,10 @@ class ManageAPIService:
     @staticmethod
     def _validate_candidate_level(candidate_level: str) -> bool:
         if candidate_level.lower() not in ("junior", "middle", "senior"):
-            raise Exception(
-                "Invalid candidate level. Must be 'junior', 'middle', "
-                "or 'senior'"
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid candidate level. "
+                       "Must be 'junior', 'middle', or 'senior'"
             )
         return True
 
@@ -31,13 +35,16 @@ class ManageAPIService:
             self._validate_candidate_level(candidate_level)
 
             logger.info(f"Trying to fetch repo contents for '{repo_url}'")
+
             repo_data = await self.github_service.main(repo_url)
 
             logger.info(f"Trying to analyze code with OpenAI for '{repo_url}'")
+
             code_review = await self.openai_service.analyze_code_with_openai(
-                repo_data, candidate_level, assignment_description
+                repo_data, candidate_level, assignment_description, repo_url
             )
 
             return code_review
-        except Exception as e:
-            raise Exception(f"Error validating candidate level: {e}")
+
+        except HTTPException as exc:
+            raise Exception(f"Error validating candidate level: {exc}")
