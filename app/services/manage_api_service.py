@@ -51,8 +51,9 @@ class ManageAPIService:
             end_time_analyzing_code = datetime.now()
 
             time_for_fetching_repo = end_time_fetching_repo - start_time
-            time_for_analyzing_code = (end_time_analyzing_code -
-                                       end_time_fetching_repo)
+            time_for_analyzing_code = (
+                end_time_analyzing_code - end_time_fetching_repo
+            )
             total_time = end_time_analyzing_code - start_time
 
             logger.info(
