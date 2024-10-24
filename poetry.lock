@@ -846,6 +846,24 @@ docs = ["sphinx (>=5.3)", "sphinx-rtd-theme (>=1.0)"]
 testing = ["coverage (>=6.2)", "hypothesis (>=5.7.1)"]
 
 [[package]]
+name = "pytest-cov"
+version = "5.0.0"
+description = "Pytest plugin for measuring coverage."
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "pytest-cov-5.0.0.tar.gz", hash = "sha256:5837b58e9f6ebd335b0f8060eecce69b662415b16dc503883a02f45dfeb14857"},
+    {file = "pytest_cov-5.0.0-py3-none-any.whl", hash = "sha256:4f0764a1219df53214206bf1feea4633c3b558a2925c8b59f144f682861ce652"},
+]
+
+[package.dependencies]
+coverage = {version = ">=5.2.1", extras = ["toml"]}
+pytest = ">=4.6"
+
+[package.extras]
+testing = ["fields", "hunter", "process-tests", "pytest-xdist", "virtualenv"]
+
+[[package]]
 name = "pytest-mock"
 version = "3.14.0"
 description = "Thin-wrapper around the mock package for easier use with pytest"
@@ -1144,4 +1162,4 @@ standard = ["colorama (>=0.4)", "httptools (>=0.5.0)", "python-dotenv (>=0.13)",
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "251e54ecc560ba82aa7954d5823fe08a530843b1684548a90f13f95bdfea7c37"
+content-hash = "921f176691d7c697747959e18ae6a7714b61da45ebe05bf721ada82eb01a2131"
